@@ -7,10 +7,10 @@ const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
 
 // Token limits per AI provider
 const TOKEN_LIMITS: Record<string, number> = {
-  gemini: 30000, // Gemini Pro supports up to 32k
-  anthropic: 100000, // Claude supports up to 200k
-  openai: 8000, // GPT-4 base model
-  github: 8000, // GitHub Copilot (uses GPT-4)
+  gemini: 32000, // Gemini version gratuita (32k contexto)
+  anthropic: 100000, // Claude limits vary (up to ~200k paid)
+  openai: 16000, // GPT-5.1 Instant (16k contexto)
+  github: 8000, // Copilot chat window (~8k)
 };
 
 const getProviderDisplayName = (provider: string): string => {
@@ -31,7 +31,7 @@ interface Message {
   originalPrompt?: string;
   originalAttachments?: {
     name: string;
-    type: "file" | "image";
+    type: "file" | "image" | "folder";
     data: string;
   }[];
   provider?: string;
@@ -119,7 +119,7 @@ function App() {
   const [inputValue, setInputValue] = useState("");
   const [language, setLanguage] = useState("en");
   const [attachments, setAttachments] = useState<
-    { name: string; type: "file" | "image"; data: string }[]
+    { name: string; type: "file" | "folder" | "image"; data: string }[]
   >([]);
 
   // Calculate total tokens and get limit for current provider
@@ -232,7 +232,7 @@ function App() {
     originalPrompt: string,
     originalAttachments?: {
       name: string;
-      type: "file" | "image";
+      type: "file" | "image" | "folder";
       data: string;
     }[]
   ) => {
@@ -642,8 +642,13 @@ function App() {
         {attachments.length > 0 && (
           <div className="attachments-preview">
             {attachments.map((att, i) => (
-              <div key={i} className="attachment-chip">
-                @: {att.name}
+              <div
+                key={i}
+                className={`attachment-chip ${
+                  att.type === "folder" ? "chip-folder" : "chip-file"
+                }`}
+              >
+                @{att.name}
                 <button onClick={() => removeAttachment(i)}>×</button>
               </div>
             ))}
@@ -687,10 +692,10 @@ function App() {
           <div className="input-actions">
             <button
               className="attachment-btn"
-              onClick={() => vscode.postMessage({ type: "selectOpenFiles" })}
-              title="Add open files as context"
+              onClick={() => vscode.postMessage({ type: "openContextPicker" })}
+              title="Add files or folders as context"
             >
-              @ Files
+              @Add Context
             </button>
             <button
               className="vscode-button"

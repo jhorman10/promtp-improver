@@ -6,6 +6,168 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
+  private async processFileAttachment(uri: vscode.Uri) {
+    try {
+      const content = await vscode.workspace.fs.readFile(uri);
+      const textContent = new TextDecoder().decode(content);
+      const fileName = uri.fsPath.split("/").pop() || "file";
+
+      this._view?.webview.postMessage({
+        type: "addContext",
+        value: [
+          {
+            name: fileName,
+            type: "file",
+            data: textContent.slice(0, 50000),
+          },
+        ],
+      });
+      vscode.window.showInformationMessage(`Attached file: ${fileName}`);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Error reading file: ${e}`);
+    }
+  }
+
+  private async processFolderAttachment(uri: vscode.Uri, folderName: string) {
+    let combinedContent = "";
+    let fileCount = 0;
+    const MAX_FILES = 50;
+    const MAX_DEPTH = 3;
+
+    const readFolderRecursively = async (
+      currentUri: vscode.Uri,
+      depth: number
+    ): Promise<void> => {
+      if (depth > MAX_DEPTH || fileCount >= MAX_FILES) return;
+      try {
+        const entries = await vscode.workspace.fs.readDirectory(currentUri);
+        for (const [name, type] of entries) {
+          if (fileCount >= MAX_FILES) break;
+          // Skip hidden files and common ignore folders
+          if (
+            name.startsWith(".") ||
+            name === "node_modules" ||
+            name === "out" ||
+            name === "dist" ||
+            name === "build" ||
+            name === "target"
+          )
+            continue;
+
+          const entryUri = vscode.Uri.joinPath(currentUri, name);
+
+          if (type === vscode.FileType.File) {
+            try {
+              const content = await vscode.workspace.fs.readFile(entryUri);
+              const text = new TextDecoder().decode(content);
+              // Simple binary check
+              if (!text.slice(0, 100).includes("\0")) {
+                const relPath = entryUri.fsPath.replace(uri.fsPath, "");
+                combinedContent += `\n--- File: ${relPath} ---\n${text.slice(
+                  0,
+                  20000
+                )}\n`;
+                fileCount++;
+              }
+            } catch (e) {}
+          } else if (type === vscode.FileType.Directory) {
+            await readFolderRecursively(entryUri, depth + 1);
+          }
+        }
+      } catch (e) {
+        console.error(`Error reading directory ${currentUri.fsPath}:`, e);
+      }
+    };
+
+    await readFolderRecursively(uri, 1);
+
+    if (fileCount > 0) {
+      this._view?.webview.postMessage({
+        type: "addContext",
+        value: [
+          {
+            name: folderName,
+            type: "folder",
+            data: combinedContent,
+          },
+        ],
+      });
+      vscode.window.showInformationMessage(
+        `Attached ${fileCount} files from folder "${folderName}".`
+      );
+    } else {
+      vscode.window.showWarningMessage(
+        `No matching text files found in "${folderName}".`
+      );
+    }
+  }
+
+  private async handleSelectOpenFiles() {
+    // Get all open tabs from all tab groups (matches "Open Editors" section)
+    const allTabs: { label: string; uri: vscode.Uri }[] = [];
+
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          const uri = tab.input.uri;
+          if (uri.scheme === "file") {
+            allTabs.push({
+              label: tab.label,
+              uri: uri,
+            });
+          }
+        }
+      }
+    }
+
+    if (allTabs.length === 0) {
+      vscode.window.showWarningMessage(
+        "No files are currently open in the editor."
+      );
+      return;
+    }
+
+    const items = allTabs.map((tab) => ({
+      label: tab.label,
+      description: tab.uri.fsPath,
+      picked: false,
+      uri: tab.uri,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      canPickMany: true,
+      placeHolder: "Select files to use as context",
+      title: "Open Editors",
+    });
+
+    if (selected && selected.length > 0) {
+      const attachments: { name: string; type: string; data: string }[] = [];
+
+      for (const item of selected) {
+        try {
+          const content = await vscode.workspace.fs.readFile(item.uri);
+          const textContent = new TextDecoder().decode(content);
+          attachments.push({
+            name: item.label,
+            type: "file",
+            data: textContent.slice(0, 50000), // Limit to 50k chars
+          });
+        } catch (e) {
+          attachments.push({
+            name: item.label,
+            type: "file",
+            data: `[Could not read file: ${item.uri.fsPath}]`,
+          });
+        }
+      }
+
+      this._view?.webview.postMessage({
+        type: "addContext",
+        value: attachments,
+      });
+    }
+  }
+
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -277,70 +439,255 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
-        case "selectOpenFiles": {
-          // Get all open tabs from all tab groups (matches "Open Editors" section)
-          const allTabs: { label: string; uri: vscode.Uri }[] = [];
-
-          for (const tabGroup of vscode.window.tabGroups.all) {
-            for (const tab of tabGroup.tabs) {
-              if (tab.input instanceof vscode.TabInputText) {
-                const uri = tab.input.uri;
-                if (uri.scheme === "file") {
-                  allTabs.push({
-                    label: tab.label,
-                    uri: uri,
-                  });
-                }
-              }
-            }
-          }
-
-          if (allTabs.length === 0) {
-            vscode.window.showWarningMessage(
-              "No files are currently open in the editor."
-            );
+        case "openContextPicker": {
+          const workspaceFolders = vscode.workspace.workspaceFolders;
+          if (!workspaceFolders) {
+            vscode.window.showWarningMessage("No workspace folder open.");
             break;
           }
 
-          const items = allTabs.map((tab) => ({
-            label: tab.label,
-            description: tab.uri.fsPath,
-            picked: false,
-            uri: tab.uri,
-          }));
+          const rootUri = workspaceFolders[0].uri;
+          let currentUri = rootUri;
 
-          const selected = await vscode.window.showQuickPick(items, {
-            canPickMany: true,
-            placeHolder: "Select files to use as context",
-            title: "Open Editors",
-          });
+          const pickItem = async () => {
+            try {
+              const entries = await vscode.workspace.fs.readDirectory(
+                currentUri
+              );
+              // Sort: folders first, then files
+              entries.sort((a, b) => {
+                if (a[1] === b[1]) return a[0].localeCompare(b[0]);
+                return a[1] === vscode.FileType.Directory ? -1 : 1;
+              });
 
-          if (selected && selected.length > 0) {
-            const attachments: { name: string; type: string; data: string }[] =
-              [];
+              const items: vscode.QuickPickItem[] = [];
 
-            for (const item of selected) {
-              try {
-                const content = await vscode.workspace.fs.readFile(item.uri);
-                const textContent = new TextDecoder().decode(content);
-                attachments.push({
-                  name: item.label,
-                  type: "file",
-                  data: textContent.slice(0, 50000), // Limit to 50k chars
+              // Add ".." option if not at root
+              if (currentUri.fsPath !== rootUri.fsPath) {
+                items.push({
+                  label: "$(arrow-left) ..",
+                  description: "Go back",
+                  alwaysShow: true,
                 });
-              } catch (e) {
-                attachments.push({
-                  name: item.label,
-                  type: "file",
-                  data: `[Could not read file: ${item.uri.fsPath}]`,
+              } else {
+                // Add "Select Open Files" option at root for convenience
+                items.push({
+                  label: "$(file-text) Add Open Files",
+                  description: "Select from open tabs",
+                  detail: "special:open-files",
                 });
               }
-            }
 
-            this._view?.webview.postMessage({
-              type: "addContext",
-              value: attachments,
-            });
+              // Add "Select This Folder" option
+              items.push({
+                label: "$(check) Select This Folder",
+                description: `Add all files in "${currentUri.fsPath
+                  .split("/")
+                  .pop()}"`,
+                detail: "special:select-current-folder",
+              });
+
+              // Add file/folder entries
+              for (const [name, type] of entries) {
+                if (
+                  name.startsWith(".") ||
+                  name === "node_modules" ||
+                  name === "out" ||
+                  name === "dist"
+                )
+                  continue;
+
+                if (type === vscode.FileType.Directory) {
+                  items.push({
+                    label: `$(folder) ${name}`,
+                    description: "Folder",
+                    detail: name, // Store name to reconstruct path
+                  });
+                } else if (type === vscode.FileType.File) {
+                  items.push({
+                    label: `$(file) ${name}`,
+                    description: "File",
+                    detail: name,
+                  });
+                }
+              }
+
+              const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `Browsing: ${vscode.workspace.asRelativePath(
+                  currentUri
+                )}`,
+                ignoreFocusOut: true,
+              });
+
+              if (!selected) {
+                return; // User cancelled
+              }
+
+              if (selected.detail === "special:open-files") {
+                await this.handleSelectOpenFiles();
+                return;
+              }
+
+              if (selected.detail === "special:select-current-folder") {
+                // Process current folder
+                const folderName =
+                  currentUri.fsPath.split("/").pop() || "folder";
+                await this.processFolderAttachment(currentUri, folderName);
+                return;
+              }
+
+              if (selected.label.startsWith("$(arrow-left)")) {
+                // Go up
+                currentUri = vscode.Uri.joinPath(currentUri, "..");
+                await pickItem();
+                return;
+              }
+
+              // It's a file or folder navigation
+              const selectedName = selected.detail!;
+              const selectedUri = vscode.Uri.joinPath(currentUri, selectedName);
+
+              if (selected.label.startsWith("$(folder)")) {
+                // Navigate into folder
+                currentUri = selectedUri;
+                await pickItem();
+              } else {
+                // It's a file, add it
+                await this.processFileAttachment(selectedUri);
+              }
+            } catch (e) {
+              vscode.window.showErrorMessage(`Error browsing: ${e}`);
+            }
+          };
+
+          await pickItem();
+          break;
+        }
+
+        case "selectOpenFiles": {
+          await this.handleSelectOpenFiles();
+          break;
+        }
+
+        case "selectFolder": {
+          const workspaceFolders = vscode.workspace.workspaceFolders;
+          if (!workspaceFolders) {
+            vscode.window.showWarningMessage("No workspace open.");
+            break;
+          }
+
+          const items = workspaceFolders.map((wf) => ({
+            label: `$(folder) ${wf.name}`,
+            description: wf.uri.fsPath,
+            uri: wf.uri,
+          }));
+
+          items.push({
+            label: "$(search) Browse...",
+            description: "Select a folder from the system dialog",
+            uri: undefined as any,
+          });
+
+          const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: "Select a folder to attach",
+            title: "Attach Folder",
+          });
+
+          if (!selected) break;
+
+          let rootUri: vscode.Uri | undefined = selected.uri;
+
+          if (!rootUri) {
+            // Browse selected
+            const options: vscode.OpenDialogOptions = {
+              canSelectMany: false,
+              openLabel: "Attach Folder",
+              canSelectFiles: false,
+              canSelectFolders: true,
+              defaultUri: workspaceFolders[0].uri,
+            };
+            const uris = await vscode.window.showOpenDialog(options);
+            if (uris && uris[0]) rootUri = uris[0];
+          }
+
+          if (rootUri) {
+            const folderName = rootUri.fsPath.split("/").pop() || "folder";
+            let combinedContent = "";
+            let fileCount = 0;
+            const MAX_FILES = 50;
+            const MAX_DEPTH = 3;
+
+            // Recursive function to read files
+            const readFolderRecursively = async (
+              uri: vscode.Uri,
+              depth: number
+            ): Promise<void> => {
+              if (depth > MAX_DEPTH || fileCount >= MAX_FILES) return;
+
+              try {
+                const entries = await vscode.workspace.fs.readDirectory(uri);
+
+                for (const [name, type] of entries) {
+                  if (fileCount >= MAX_FILES) break;
+
+                  // Skip hidden files/folders and common ignores
+                  if (
+                    name.startsWith(".") ||
+                    name === "node_modules" ||
+                    name === "out" ||
+                    name === "dist"
+                  )
+                    continue;
+
+                  const entryUri = vscode.Uri.joinPath(uri, name);
+
+                  if (type === vscode.FileType.File) {
+                    try {
+                      const content = await vscode.workspace.fs.readFile(
+                        entryUri
+                      );
+                      const text = new TextDecoder().decode(content);
+                      // Only include text files (simple heuristic: no null bytes in first 100 chars)
+                      if (!text.slice(0, 100).includes("\0")) {
+                        combinedContent += `\n--- File: ${entryUri.fsPath.replace(
+                          rootUri!.fsPath,
+                          ""
+                        )} ---\n${text.slice(0, 20000)}\n`;
+                        fileCount++;
+                      }
+                    } catch (e) {
+                      // Skip unreadable files
+                    }
+                  } else if (type === vscode.FileType.Directory) {
+                    await readFolderRecursively(entryUri, depth + 1);
+                  }
+                }
+              } catch (e) {
+                console.error(`Error reading directory ${uri.fsPath}:`, e);
+              }
+            };
+
+            await readFolderRecursively(rootUri, 1);
+
+            if (fileCount > 0) {
+              this._view?.webview.postMessage({
+                type: "addContext",
+                value: [
+                  {
+                    name: folderName,
+                    type: "folder",
+                    data: combinedContent,
+                  },
+                ],
+              });
+              vscode.window.showInformationMessage(
+                `Attached ${fileCount} files from folder "${folderName}".`
+              );
+            } else {
+              vscode.window.showWarningMessage(
+                `No matching text files found in "${folderName}".`
+              );
+            }
           }
           break;
         }
