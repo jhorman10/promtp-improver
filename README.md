@@ -66,6 +66,21 @@ Enter your personal API Key for any provider:
    - **Apply** the improved prompt to your editor.
    - **Copy** or **Regenerate** if needed.
 
+### 📋 Example
+
+**Input:**
+
+```
+Write code to sort a list
+```
+
+**Output (Improved):**
+
+> **Context:** You are an expert Python developer.
+> **Objective:** Create an efficient sorting function for a list of integers.
+> **Constraints:** Use built-in methods, handle edge cases (empty list, single element).
+> **Output Format:** Python function with docstring and type hints.
+
 ---
 
 ## Español
@@ -120,6 +135,21 @@ Ingresa tu API Key personal para cualquier proveedor:
    - Revisa la **Crítica** y el **Plan de Acción**.
    - **Apply (Aplicar)** el prompt mejorado en tu editor.
    - **Copiar** o **Regenerar** si es necesario.
+
+### 📋 Ejemplo
+
+**Entrada:**
+
+```
+Escribe código para ordenar una lista
+```
+
+**Salida (Mejorada):**
+
+> **Contexto:** Eres un desarrollador Python experto.
+> **Objetivo:** Crear una función eficiente de ordenamiento para una lista de enteros.
+> **Restricciones:** Usar métodos integrados, manejar casos límite (lista vacía, un solo elemento).
+> **Formato de Salida:** Función Python con docstring y type hints.
 
 ---
 

@@ -2,7 +2,7 @@
   "name": "prompt-improver-chat",
   "displayName": "Prompt Improver (Chat)",
   "description": "AI-powered prompt improvement assistant with a chat interface.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "JhormanOrozco",
   "repository": {
     "type": "git",
