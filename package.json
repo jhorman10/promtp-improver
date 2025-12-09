@@ -1,0 +1,105 @@
+{
+  "name": "prompt-improver-chat",
+  "displayName": "Prompt Improver (Chat)",
+  "description": "AI-powered prompt improvement assistant with a chat interface.",
+  "version": "0.0.1",
+  "publisher": "antigravity",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/antigravity/prompt-improver-chat.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "icon": "resources/icon.png",
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "prompt-improver-chat-view",
+          "title": "Prompt Improver",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "prompt-improver-chat-view": [
+        {
+          "type": "webview",
+          "id": "promptImprover.chatView",
+          "name": "Chat",
+          "icon": "resources/icon.svg",
+          "contextualTitle": "Prompt Improver"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "promptImprover.improvePrompt",
+        "title": "Improve Prompt",
+        "icon": "$(sparkle)"
+      }
+    ],
+    "configuration": {
+      "title": "Prompt Improver",
+      "properties": {
+        "promptImprover.provider": {
+          "type": "string",
+          "enum": [
+            "gemini",
+            "anthropic",
+            "openai",
+            "github"
+          ],
+          "default": "gemini",
+          "description": "Select the AI provider to use for prompt analysis."
+        },
+        "promptImprover.githubToken": {
+          "type": "string",
+          "description": "Personal Access Token for GitHub (optional if using Sign In)."
+        },
+        "promptImprover.geminiApiKey": {
+          "type": "string",
+          "description": "API Key for Google Gemini."
+        },
+        "promptImprover.anthropicApiKey": {
+          "type": "string",
+          "description": "API Key for Anthropic Claude."
+        },
+        "promptImprover.openaiApiKey": {
+          "type": "string",
+          "description": "API Key for OpenAI."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "build:webview": "cd webview-ui && npm install && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.14.0",
+    "@google/generative-ai": "^0.24.1",
+    "@vscode/codicons": "^0.0.43",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "openai": "^6.9.1",
+    "react-markdown": "^10.1.0"
+  }
+}
