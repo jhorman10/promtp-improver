@@ -23,21 +23,42 @@ main {
 }
 
 /* Header estilizado */
-header {
+header, .header {
   padding: 0.5rem 1rem;
   background-color: var(--vscode-sideBar-background);
   border-bottom: 1px solid var(--vscode-widget-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Sombra sutil */
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
 }
 
-h1 {
-  font-size: 1rem;
-  margin: 0;
-  font-weight: 600;
-  color: var(--vscode-sideBarTitle-foreground);
+.provider-selector {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  padding: 0.4rem;
+  font-size: 1.2rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  margin-left: 0.5rem;
+}
+
+.icon-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 /* Chat list con scroll optimizado */
@@ -68,12 +89,12 @@ h1 {
 }
 
 .message.assistant {
-  background-color: transparent; /* Integrado al fondo */
+  background-color: transparent;
   align-self: flex-start;
   width: 100%;
   max-width: 100%;
-  border-left: 2px solid var(--vscode-activityBar-activeBorder); /* Acento visual */
-  padding-left: 0.8rem;
+  border-left: none; /* Removed blue line */
+  padding-left: 0;   /* Removed extra padding */
 }
 
 /* Badges y metadatos */
@@ -122,7 +143,9 @@ pre {
   border: 1px solid var(--vscode-widget-border);
   border-radius: 4px;
   padding: 0.5rem;
-  overflow-x: auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  white-space: pre-wrap; /* Wrap text vertically */
+  word-wrap: break-word; /* Ensure wrapping */
   font-family: var(--vscode-editor-font-family);
   font-size: 0.9em;
   margin: 0.5rem 0;
@@ -270,20 +293,23 @@ pre {
 }
 
 .attachment-chip {
-  background-color: rgba(255, 255, 255, 0.1); /* Transparencia solicitada */
+  background-color: rgba(255, 255, 255, 0.1); /* Fallback */
   color: var(--vscode-foreground);
-  padding: 0.1rem 0.5rem; /* Padding vertical reducido */
-  border-radius: 12px; /* Redondeado */
+  padding: 0.1rem 0.5rem;
+  border-radius: 12px;
   font-size: 0.75rem;
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  border: 1px solid var(--vscode-widget-border);
-  transition: transform 0.1s;
+  border: 1px solid transparent; /* Prepare for border transition */
+  transition: all 0.2s ease; /* Smooth transition for color/filter */
+  backdrop-filter: blur(4px); /* Modern glass effect */
 }
 
 .attachment-chip:hover {
-  transform: scale(1.02);
+  transform: none; /* Eliminar cambio de tamaño */
+  filter: brightness(0.85); /* Oscurecer un poco al hover */
+  cursor: pointer;
 }
 
 .attachment-chip button {
@@ -302,20 +328,21 @@ pre {
   opacity: 1;
 }
 
-/* Colores específicos para chips */
+/* Colores específicos para chips con transparencia */
 .chip-file {
-  background-color: #2196F3 !important;
-  color: white !important;
-  border: none;
-  box-shadow: 0 1px 2px rgba(33, 150, 243, 0.3);
+  background-color: rgba(33, 150, 243, 0.25) !important; /* Azul semitransparente */
+  color: var(--vscode-foreground) !important; /* Texto legible del tema */
+  border: 1px solid rgba(33, 150, 243, 0.4);
 }
 
 .chip-folder {
-  background-color: #ffffff !important;
-  color: #333 !important;
-  border: 1px solid #ddd;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background-color: rgba(255, 255, 255, 0.15) !important; /* Blanco semitransparente */
+  color: var(--vscode-foreground) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
+
+/* Ensure high contrast text if needed, but using VS Code vars is safer for themes */
+/* If the user wants "seen clearly", sticking to theme foreground on a subtle background works best across light/dark modes */
 
 /* Loading spinner */
 .loading {
