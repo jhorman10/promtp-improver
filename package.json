@@ -2,11 +2,11 @@
   "name": "prompt-improver-chat",
   "displayName": "Prompt Improver (Chat)",
   "description": "AI-powered prompt improvement assistant with a chat interface.",
-  "version": "0.0.2",
-  "publisher": "antigravity",
+  "version": "0.0.3",
+  "publisher": "JhormanOrozco",
   "repository": {
     "type": "git",
-    "url": "https://github.com/antigravity/prompt-improver-chat.git"
+    "url": "https://github.com/jhorman10/promtp-improver.git"
   },
   "engines": {
     "vscode": "^1.85.0"
